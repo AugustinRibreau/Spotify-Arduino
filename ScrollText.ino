@@ -10,13 +10,13 @@ int initial = 0;
 LedControl lc=LedControl(2,3,4,numDevices);//D11=DATA, D13=CLK, D10=LOAD //select the used pins 
 
 String musicName = "Mouv' du Boug";
-float progress_ms = 10564;
+float progress_ms = 0;
 float duration_ms = 180000;
 int percentageAvancement;
 byte avancementMusique[] = { B00000000, B10000000, B11000000, B11100000, B11110000, B11111000, B11111100, B11111110, B11111111 };
 unsigned long lastCheck = 0;
 
-const unsigned char initialText[] PROGMEM ={""}; //This will be the initial displayed text
+const unsigned char initialText[] PROGMEM ={"Mouv' du boug      "}; //This will be the initial displayed text
 /*After you send a text using the smartphone (bluetooth) you have to wait till the
 last text finish scrooling. Once it finish, your new text will be displayed. */
 
@@ -124,17 +124,19 @@ const unsigned char scrollText92[] PROGMEM ={"~"};
 
 //We start our setup
 void setup(){
+
   Serial.begin(9600);     //Start the serial comunication fot the bluetooth module
   for (int x=0; x<numDevices; x++){
     lc.shutdown(x,false);       //The MAX72XX is in power-saving mode on startup
-    lc.setIntensity(x,8);       // Set the brightness to default value
+    lc.setIntensity(x,4);       // Set the brightness to default value
     lc.clearDisplay(x);         // and clear the display
     }
+    initDuration();
 }
 
 //We start the infinite loop 
 void loop(){ 
-  //We start scrooling the initial text
+  //We start scrolling the initial text
   if(initial==0)
   {
     scrollMessage(initialText);
@@ -143,7 +145,7 @@ void loop(){
   while(Serial.available() > 0) // Don't read unless you receive something new
     {
       message = Serial.readString() + "          "; //Store the bluetooth received text
-      initial=1; 
+      initial=1;
     }
   //Go letter by letter and send the dots vector for the LEDs to the drivers
   for (int i=0; i < message.length(); i++)
@@ -1569,7 +1571,58 @@ void printBufferLong(){
   }
 }
 
+void initDuration() {
+
+  // On réduit le pourcentage de progression sur 32
+
+  percentageAvancement = round((progress_ms/duration_ms)*32);
+
+  int surplus = percentageAvancement%8;
+  int nbDeviceToTurnOn = percentageAvancement/8;
+
+  int currentDevice = 3;
+
+  //  percentageAvancement = 12;
+  // Passage 1 :
+  //  currentDevice = 3
+  //  i = nbDeviceToTurnOn = 1
+  // avancementMusique[percentageAvancement-a]
+  // Passage 2 :
+  //  currentDevice = 2
+  //  i = nbDeviceToTurnOn = 2
+  // avancementMusique[percentageAvancement-a]
+
+  /*for(int i=nbDeviceToTurnOn; i>=0; i--) {
+
+    lc.setRow(currentDevice, 7, (avancementMusique[percentageAvancement/(nbDeviceToTurnOn+surplus)]));
+    currentDevice--;
+  }
+  lc.setRow(currentDevice, 7, (avancementMusique[surplus]));
+  */
+
+
+  int device = 3;
+  int counter = 0;
+
+  while (percentageAvancement > 0) {
+
+    // Quand on atteind 8, on passe au device suivant car on a allumé toutes les leds précédentes
+    if (counter == 8) {
+      counter = 0;
+      device--;
+    }
+    
+    
+    lc.setLed(device, 7, counter, true);
+
+    counter++;
+    percentageAvancement--;
+  }
+}
+
 void setDuration() {
+  // On perd quelques chiffres
+  //Serial.println(percentageAvancement);
 
 
   if (percentageAvancement < 9) {
@@ -1580,11 +1633,11 @@ void setDuration() {
     lc.setRow(2, 7, avancementMusique[percentageAvancement - 8]);
   }
 
-  if (percentageAvancement > 16 && percentageAvancement < 25) {
+  if (percentageAvancement > 17 && percentageAvancement < 25) {
     lc.setRow(1, 7, avancementMusique[percentageAvancement - 16]);
   }
 
-  if (percentageAvancement > 24 && percentageAvancement < 33) {
+  if (percentageAvancement > 25 && percentageAvancement < 33) {
     lc.setRow(0, 7, avancementMusique[percentageAvancement - 24]);
   }
 
