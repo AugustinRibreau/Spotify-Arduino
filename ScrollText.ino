@@ -1572,19 +1572,19 @@ void printBufferLong(){
 void setDuration() {
 
 
-  if (percentageAvancement < 8) {
-    lc.setRow(3, 7, avancementMusique[percentageAvancement - 1]);
+  if (percentageAvancement < 9) {
+    lc.setRow(3, 7, avancementMusique[percentageAvancement]);
   }
 
-  if (percentageAvancement > 8 && percentageAvancement < 16) {
+  if (percentageAvancement > 8 && percentageAvancement < 17) {
     lc.setRow(2, 7, avancementMusique[percentageAvancement - 8]);
   }
 
-  if (percentageAvancement > 16 && percentageAvancement < 24) {
+  if (percentageAvancement > 16 && percentageAvancement < 25) {
     lc.setRow(1, 7, avancementMusique[percentageAvancement - 16]);
   }
 
-  if (percentageAvancement > 24 && percentageAvancement < 32) {
+  if (percentageAvancement > 24 && percentageAvancement < 33) {
     lc.setRow(0, 7, avancementMusique[percentageAvancement - 24]);
   }
 
