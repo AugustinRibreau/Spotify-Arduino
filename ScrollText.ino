@@ -1,22 +1,26 @@
 #include <LedControl.h>   //inport the library, make sure to install it first
 #include <math.h>
-String message ="";       //create an empty string to store the future received data 
+#include <ArduinoJson.h>
+String message;
+String message_received ="";       //create an empty string to store the future received data 
 
  
 const int numDevices = 4;      // number of MAX7219s used in this case 4
 const long scrollDelay = 60;   // adjust scrolling speed (lower dela -> higher scroll speed)
 unsigned long bufferLong [14] = {0}; 
 int initial = 0;
-LedControl lc=LedControl(2,3,4,numDevices);//D11=DATA, D13=CLK, D10=LOAD //select the used pins 
+LedControl lc=LedControl(12,10,11,numDevices);//D11=DATA, D13=CLK, D10=LOAD //select the used pins 
 
 String musicName = "Mouv' du Boug";
-float progress_ms = 0;
+float progress_ms = 1000;
 float duration_ms = 180000;
 int percentageAvancement;
 byte avancementMusique[] = { B00000000, B10000000, B11000000, B11100000, B11110000, B11111000, B11111100, B11111110, B11111111 };
 unsigned long lastCheck = 0;
 
-const unsigned char initialText[] PROGMEM ={"Mouv' du boug      "}; //This will be the initial displayed text
+StaticJsonBuffer<200> jsonBuffer;
+
+const unsigned char initialText[] PROGMEM ={""}; //This will be the initial displayed text
 /*After you send a text using the smartphone (bluetooth) you have to wait till the
 last text finish scrooling. Once it finish, your new text will be displayed. */
 
@@ -144,8 +148,23 @@ void loop(){
   
   while(Serial.available() > 0) // Don't read unless you receive something new
     {
-      message = Serial.readString() + "          "; //Store the bluetooth received text
+      message_received = Serial.readString(); //Store the bluetooth received text
       initial=1;
+      
+      JsonObject& root = jsonBuffer.parseObject(message_received);
+
+      if(!root.success()) {
+        Serial.println("parseObject() failed");
+      } else {
+         long progress_duration = root["progress_duration"];
+         progress_ms = progress_duration;
+         long total_duration_ms = root["total_duration_ms"];
+         duration_ms = total_duration_ms;
+         char* current_music = root["current_music"];
+         message = current_music;
+      }
+
+
     }
   //Go letter by letter and send the dots vector for the LEDs to the drivers
   for (int i=0; i < message.length(); i++)
@@ -162,7 +181,7 @@ void loop(){
       if (now > (lastCheck + 1000)) {
         lastCheck = now;
         setDuration();
-        progress_ms += 5000;
+        progress_ms += 1000;
       }
       
       if (message[i] == ' ')
