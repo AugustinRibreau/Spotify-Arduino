@@ -1,24 +1,26 @@
-#include <LedControl.h>   //inport the library, make sure to install it first
+#include <LedControl.h>   //import the library, make sure to install it first
 #include <math.h>
 #include <ArduinoJson.h>
 String message;
-String message_received ="";       //create an empty string to store the future received data 
+String message_received ="";       //create an empty string to store the future received data
 
- 
+
 const int numDevices = 4;      // number of MAX7219s used in this case 4
 const long scrollDelay = 60;   // adjust scrolling speed (lower dela -> higher scroll speed)
-unsigned long bufferLong [14] = {0}; 
+unsigned long bufferLong [14] = {0};
 int initial = 0;
-LedControl lc=LedControl(12,10,11,numDevices);//D11=DATA, D13=CLK, D10=LOAD //select the used pins 
+LedControl lc=LedControl(12,11,10,numDevices);//D11=DATA, D13=CLK, D10=LOAD //select the used pins
 
-String musicName = "Mouv' du Boug";
+char* current_music;
 float progress_ms = 1000;
 float duration_ms = 180000;
+long progress_duration;
+long total_duration_ms;
 int percentageAvancement;
 byte avancementMusique[] = { B00000000, B10000000, B11000000, B11100000, B11110000, B11111000, B11111100, B11111110, B11111111 };
 unsigned long lastCheck = 0;
 
-StaticJsonBuffer<200> jsonBuffer;
+StaticJsonDocument<200> doc;
 
 const unsigned char initialText[] PROGMEM ={""}; //This will be the initial displayed text
 /*After you send a text using the smartphone (bluetooth) you have to wait till the
@@ -126,523 +128,526 @@ const unsigned char scrollText90[] PROGMEM ={"|"};
 const unsigned char scrollText91[] PROGMEM ={"}"};
 const unsigned char scrollText92[] PROGMEM ={"~"};
 
+boolean readSerial = true;
+
 //We start our setup
 void setup(){
 
   Serial.begin(9600);     //Start the serial comunication fot the bluetooth module
   for (int x=0; x<numDevices; x++){
-    lc.shutdown(x,false);       //The MAX72XX is in power-saving mode on startup
-    lc.setIntensity(x,4);       // Set the brightness to default value
-    lc.clearDisplay(x);         // and clear the display
-    }
-    initDuration();
+      lc.shutdown(x,false);       //The MAX72XX is in power-saving mode on startup
+      lc.setIntensity(x,4);       // Set the brightness to default value
+      lc.clearDisplay(x);         // and clear the display
+   }
+   requestData();
 }
 
-//We start the infinite loop 
-void loop(){ 
-  //We start scrolling the initial text
-  if(initial==0)
-  {
-    scrollMessage(initialText);
-  }
-  
-  while(Serial.available() > 0) // Don't read unless you receive something new
-    {
-      message_received = Serial.readString(); //Store the bluetooth received text
-      initial=1;
-      
-      JsonObject& root = jsonBuffer.parseObject(message_received);
+void requestData() {
+  Serial.println("requestData");
+  readSerial = true;
+}
 
-      if(!root.success()) {
-        Serial.println("parseObject() failed");
-      } else {
-         long progress_duration = root["progress_duration"];
-         progress_ms = progress_duration;
-         long total_duration_ms = root["total_duration_ms"];
-         duration_ms = total_duration_ms;
-         char* current_music = root["current_music"];
-         message = current_music;
-      }
-
-
-    }
-  //Go letter by letter and send the dots vector for the LEDs to the drivers
-  for (int i=0; i < message.length(); i++)
-    {
-
-      // On réduit le pourcentage de progression sur 32
-
-      percentageAvancement = round((progress_ms/duration_ms)*32);
-
+//We start the infinite loop
+void loop(){
 
       // Se baser sur la dernière fois qu'on a fait un appel pour en refaire un (si l'appel date d'il y a au moins 1s, alors on en refait un)
-      int now = millis();
-      
-      if (now > (lastCheck + 1000)) {
+      /*int now = millis();
+      // Si la première requête n'a pas fonctionnée
+      if (now > (lastCheck + 8000)) {
         lastCheck = now;
-        setDuration();
-        progress_ms += 1000;
+        requestData();
+      }*/
+
+      while(Serial.available() > 0) // Don't read unless you receive something new
+      {
+
+        if (readSerial) {
+         message_received = Serial.readString(); //Store the bluetooth received text
+
+         deserializeJson(doc, message_received);
+         progress_ms = doc["p"];
+         duration_ms = doc["t"];
+         char* current_music = doc["c"];
+         message = String(current_music) + "           ";
+         Serial.flush();
+         resetDuration();
+         initDuration();
+         readSerial = false;
+        }
+
       }
-      
-      if (message[i] == ' ')
-        {
-        scrollMessage(scrollText0);
-        }
-
-        if (message[i] == '!')
-        {
-        scrollMessage(scrollText1);
-        }
-
-        if (message[i] == '"')
-        {
-        scrollMessage(scrollText2);
-        }
-
-        if (message[i] == '#')
-        {
-        scrollMessage(scrollText3);
-        }
-
-        if (message[i] == '&')
-        {
-        scrollMessage(scrollText4);
-        } 
-        
-        if (message[i] == '%')
-        {
-        scrollMessage(scrollText5);
-        }  
-
-        if (message[i] == '&')
-        {
-        scrollMessage(scrollText5);
-        } 
-
-         if (message[i] == '(')
-        {
-        scrollMessage(scrollText8);
-        }
-
-        if (message[i] == ')')
-        {
-        scrollMessage(scrollText9);
-        }
-
-        if (message[i] == '*')
-        {
-        scrollMessage(scrollText10);
-        }
-
-        if (message[i] == '+')
-        {
-        scrollMessage(scrollText11);
-        }
-
-        if (message[i] == ',')
-        {
-        scrollMessage(scrollText12);
-        }
-
-        if (message[i] == '-')
-        {
-        scrollMessage(scrollText13);
-        }
-
-        if (message[i] == '.')
-        {
-        scrollMessage(scrollText14);
-        }
-
-        if (message[i] == '/')
-        {
-        scrollMessage(scrollText15);
-        }
-
-        if (message[i] == '0')
-        {
-        scrollMessage(scrollText16);
-        }
-
-        if (message[i] == '1')
-        {
-        scrollMessage(scrollText17);
-        } 
-
-        if (message[i] == '2')
-        {
-        scrollMessage(scrollText18);
-        } 
-
-        if (message[i] == '3')
-        {
-        scrollMessage(scrollText19);
-        } 
-
-        if (message[i] == '4')
-        {
-        scrollMessage(scrollText20);
-        } 
-
-        if (message[i] == '5')
-        {
-        scrollMessage(scrollText21);
-        } 
-
-        if (message[i] == '6')
-        {
-        scrollMessage(scrollText22);
-        } 
-
-        if (message[i] == '7')
-        {
-        scrollMessage(scrollText23);
-        } 
-
-        if (message[i] == '8')
-        {
-        scrollMessage(scrollText24);
-        } 
-
-        if (message[i] == '9')
-        {
-        scrollMessage(scrollText25);
-        } 
-
-        if (message[i] == ':')
-        {
-        scrollMessage(scrollText26);
-        } 
-
-        if (message[i] == '<')
-        {
-        scrollMessage(scrollText27);
-        } 
-
-        if (message[i] == '=')
-        {
-        scrollMessage(scrollText28);
-        } 
-
-        if (message[i] == '>')
-        {
-        scrollMessage(scrollText29);
-        } 
-
-        if (message[i] == '?')
-        {
-        scrollMessage(scrollText30);
-        } 
-
-        if (message[i] == '@')
-        {
-        scrollMessage(scrollText31);
-        } 
-
-        if (message[i] == 'A')
-        {
-        scrollMessage(scrollText32);
-        } 
-
-        if (message[i] == 'B')
-        {
-        scrollMessage(scrollText33);
-        } 
-
-        if (message[i] == 'C')
-        {
-        scrollMessage(scrollText34);
-        } 
-
-        if (message[i] == 'D')
-        {
-        scrollMessage(scrollText35);
-        } 
-
-        if (message[i] == 'E')
-        {
-        scrollMessage(scrollText36);
-        } 
-
-        if (message[i] == 'F')
-        {
-        scrollMessage(scrollText37);
-        } 
-
-        if (message[i] == 'G')
-        {
-        scrollMessage(scrollText38);
-        } 
-
-        if (message[i] == 'H')
-        {
-        scrollMessage(scrollText39);
-        } 
-
-        if (message[i] == 'I')
-        {
-        scrollMessage(scrollText40);
-        } 
-
-        if (message[i] == 'J')
-        {
-        scrollMessage(scrollText41);
-        } 
-
-        if (message[i] == 'K')
-        {
-        scrollMessage(scrollText42);
-        } 
-
-        if (message[i] == 'L')
-        {
-        scrollMessage(scrollText43);
-        } 
-
-        if (message[i] == 'M')
-        {
-        scrollMessage(scrollText44);
-        } 
-
-        if (message[i] == 'N')
-        {
-        scrollMessage(scrollText45);
-        } 
-
-        if (message[i] == 'O')
-        {
-        scrollMessage(scrollText46);
-        } 
-
-        if (message[i] == 'P')
-        {
-        scrollMessage(scrollText47);
-        } 
-
-        if (message[i] == 'Q')
-        {
-        scrollMessage(scrollText48);
-        } 
-
-        if (message[i] == 'R')
-        {
-        scrollMessage(scrollText49);
-        } 
-
-        if (message[i] == 'S')
-        {
-        scrollMessage(scrollText50);
-        } 
-
-        if (message[i] == 'T')
-        {
-        scrollMessage(scrollText51);
-        } 
-
-        if (message[i] == 'U')
-        {
-        scrollMessage(scrollText52);
-        } 
-
-        if (message[i] == 'V')
-        {
-        scrollMessage(scrollText53);
-        } 
-
-        if (message[i] == 'W')
-        {
-        scrollMessage(scrollText54);
-        } 
-
-        if (message[i] == 'X')
-        {
-        scrollMessage(scrollText55);
-        } 
-
-        if (message[i] == 'Y')
-        {
-        scrollMessage(scrollText56);
-        } 
-
-        if (message[i] == 'Z')
-        {
-        scrollMessage(scrollText57);
-        } 
-
-        if (message[i] == '[')
-        {
-        scrollMessage(scrollText58);
-        } 
-
-        if (message[i] == '[')
-        {
-        scrollMessage(scrollText59);
-        } 
-
-        if (message[i] == '^')
-        {
-        scrollMessage(scrollText60);
-        } 
-
-        if (message[i] == '_')
-        {
-        scrollMessage(scrollText61);
-        } 
-
-        if (message[i] == 'a')
-        {
-        scrollMessage(scrollText63);
-        } 
-
-        if (message[i] == 'b')
-        {
-        scrollMessage(scrollText64);
-        } 
-
-        if (message[i] == 'c')
-        {
-        scrollMessage(scrollText65);
-        } 
-
-        if (message[i] == 'd')
-        {
-        scrollMessage(scrollText66);
-        } 
-
-        if (message[i] == 'e')
-        {
-        scrollMessage(scrollText67);
-        } 
-
-        if (message[i] == 'f')
-        {
-        scrollMessage(scrollText68);
-        } 
-
-        if (message[i] == 'g')
-        {
-        scrollMessage(scrollText69);
-        } 
-
-        if (message[i] == 'h')
-        {
-        scrollMessage(scrollText70);
-        } 
-
-        if (message[i] == 'i')
-        {
-        scrollMessage(scrollText71);
-        } 
-
-        if (message[i] == 'j')
-        {
-        scrollMessage(scrollText72);
-        } 
-
-        if (message[i] == 'k')
-        {
-        scrollMessage(scrollText73);
-        } 
-
-        if (message[i] == 'l')
-        {
-        scrollMessage(scrollText74);
-        } 
-
-        if (message[i] == 'm')
-        {
-        scrollMessage(scrollText75);
-        } 
-
-        if (message[i] == 'n')
-        {
-        scrollMessage(scrollText76);
-        } 
-
-        if (message[i] == 'o')
-        {
-        scrollMessage(scrollText77);
-        } 
-
-        if (message[i] == 'p')
-        {
-        scrollMessage(scrollText78);
-        } 
-
-        if (message[i] == 'q')
-        {
-        scrollMessage(scrollText79);
-        } 
-
-        if (message[i] == 'r')
-        {
-        scrollMessage(scrollText80);
-        } 
-
-        if (message[i] == 's')
-        {
-        scrollMessage(scrollText81);
-        } 
-
-        if (message[i] == 't')
-        {
-        scrollMessage(scrollText82);
-        } 
-
-        if (message[i] == 'u')
-        {
-        scrollMessage(scrollText83);
-        } 
-
-        if (message[i] == 'v')
-        {
-        scrollMessage(scrollText84);
-        } 
-
-        if (message[i] == 'w')
-        {
-        scrollMessage(scrollText85);
-        } 
-
-        if (message[i] == 'x')
-        {
-        scrollMessage(scrollText86);
-        } 
-
-        if (message[i] == 'y')
-        {
-        scrollMessage(scrollText87);
-        } 
-
-        if (message[i] == 'z')
-        {
-        scrollMessage(scrollText88);
-        } 
-
-        if (message[i] == '{')
-        {
-        scrollMessage(scrollText89);
-        } 
-
-        if (message[i] == '|')
-        {
-        scrollMessage(scrollText90);
-        } 
-
-        if (message[i] == '}')
-        {
-        scrollMessage(scrollText91);
-        } 
-
-        if (message[i] == '~')
-        {
-        scrollMessage(scrollText92);
-        } 
-     }      
+
+    //Go letter by letter and send the dots vector for the LEDs to the drivers
+    for (int i=0; i < message.length(); i++)
+      {
+        //Serial.println(message[i]);
+        //Serial.println("progress_ms: " + String(progress_ms));
+
+        if (message[i] == ' ')
+          {
+          scrollMessage(scrollText0);
+          }
+
+          if (message[i] == '!')
+          {
+          scrollMessage(scrollText1);
+          }
+
+          if (message[i] == '"')
+          {
+          scrollMessage(scrollText2);
+          }
+
+          if (message[i] == '#')
+          {
+          scrollMessage(scrollText3);
+          }
+
+          if (message[i] == '&')
+          {
+          scrollMessage(scrollText4);
+          }
+
+          if (message[i] == '%')
+          {
+          scrollMessage(scrollText5);
+          }
+
+          if (message[i] == '&')
+          {
+          scrollMessage(scrollText5);
+          }
+
+           if (message[i] == '(')
+          {
+          scrollMessage(scrollText8);
+          }
+
+          if (message[i] == ')')
+          {
+          scrollMessage(scrollText9);
+          }
+
+          if (message[i] == '*')
+          {
+          scrollMessage(scrollText10);
+          }
+
+          if (message[i] == '+')
+          {
+          scrollMessage(scrollText11);
+          }
+
+          if (message[i] == ',')
+          {
+          scrollMessage(scrollText12);
+          }
+
+          if (message[i] == '-')
+          {
+          scrollMessage(scrollText13);
+          }
+
+          if (message[i] == '.')
+          {
+          scrollMessage(scrollText14);
+          }
+
+          if (message[i] == '/')
+          {
+          scrollMessage(scrollText15);
+          }
+
+          if (message[i] == '0')
+          {
+          scrollMessage(scrollText16);
+          }
+
+          if (message[i] == '1')
+          {
+          scrollMessage(scrollText17);
+          }
+
+          if (message[i] == '2')
+          {
+          scrollMessage(scrollText18);
+          }
+
+          if (message[i] == '3')
+          {
+          scrollMessage(scrollText19);
+          }
+
+          if (message[i] == '4')
+          {
+          scrollMessage(scrollText20);
+          }
+
+          if (message[i] == '5')
+          {
+          scrollMessage(scrollText21);
+          }
+
+          if (message[i] == '6')
+          {
+          scrollMessage(scrollText22);
+          }
+
+          if (message[i] == '7')
+          {
+          scrollMessage(scrollText23);
+          }
+
+          if (message[i] == '8')
+          {
+          scrollMessage(scrollText24);
+          }
+
+          if (message[i] == '9')
+          {
+          scrollMessage(scrollText25);
+          }
+
+          if (message[i] == ':')
+          {
+          scrollMessage(scrollText26);
+          }
+
+          if (message[i] == '<')
+          {
+          scrollMessage(scrollText27);
+          }
+
+          if (message[i] == '=')
+          {
+          scrollMessage(scrollText28);
+          }
+
+          if (message[i] == '>')
+          {
+          scrollMessage(scrollText29);
+          }
+
+          if (message[i] == '?')
+          {
+          scrollMessage(scrollText30);
+          }
+
+          if (message[i] == '@')
+          {
+          scrollMessage(scrollText31);
+          }
+
+          if (message[i] == 'A')
+          {
+          scrollMessage(scrollText32);
+          }
+
+          if (message[i] == 'B')
+          {
+          scrollMessage(scrollText33);
+          }
+
+          if (message[i] == 'C')
+          {
+          scrollMessage(scrollText34);
+          }
+
+          if (message[i] == 'D')
+          {
+          scrollMessage(scrollText35);
+          }
+
+          if (message[i] == 'E')
+          {
+          scrollMessage(scrollText36);
+          }
+
+          if (message[i] == 'F')
+          {
+          scrollMessage(scrollText37);
+          }
+
+          if (message[i] == 'G')
+          {
+          scrollMessage(scrollText38);
+          }
+
+          if (message[i] == 'H')
+          {
+          scrollMessage(scrollText39);
+          }
+
+          if (message[i] == 'I')
+          {
+          scrollMessage(scrollText40);
+          }
+
+          if (message[i] == 'J')
+          {
+          scrollMessage(scrollText41);
+          }
+
+          if (message[i] == 'K')
+          {
+          scrollMessage(scrollText42);
+          }
+
+          if (message[i] == 'L')
+          {
+          scrollMessage(scrollText43);
+          }
+
+          if (message[i] == 'M')
+          {
+          scrollMessage(scrollText44);
+          }
+
+          if (message[i] == 'N')
+          {
+          scrollMessage(scrollText45);
+          }
+
+          if (message[i] == 'O')
+          {
+          scrollMessage(scrollText46);
+          }
+
+          if (message[i] == 'P')
+          {
+          scrollMessage(scrollText47);
+          }
+
+          if (message[i] == 'Q')
+          {
+          scrollMessage(scrollText48);
+          }
+
+          if (message[i] == 'R')
+          {
+          scrollMessage(scrollText49);
+          }
+
+          if (message[i] == 'S')
+          {
+          scrollMessage(scrollText50);
+          }
+
+          if (message[i] == 'T')
+          {
+          scrollMessage(scrollText51);
+          }
+
+          if (message[i] == 'U')
+          {
+          scrollMessage(scrollText52);
+          }
+
+          if (message[i] == 'V')
+          {
+          scrollMessage(scrollText53);
+          }
+
+          if (message[i] == 'W')
+          {
+          scrollMessage(scrollText54);
+          }
+
+          if (message[i] == 'X')
+          {
+          scrollMessage(scrollText55);
+          }
+
+          if (message[i] == 'Y')
+          {
+          scrollMessage(scrollText56);
+          }
+
+          if (message[i] == 'Z')
+          {
+          scrollMessage(scrollText57);
+          }
+
+          if (message[i] == '[')
+          {
+          scrollMessage(scrollText58);
+          }
+
+          if (message[i] == '[')
+          {
+          scrollMessage(scrollText59);
+          }
+
+          if (message[i] == '^')
+          {
+          scrollMessage(scrollText60);
+          }
+
+          if (message[i] == '_')
+          {
+          scrollMessage(scrollText61);
+          }
+
+          if (message[i] == 'a')
+          {
+          scrollMessage(scrollText63);
+          }
+
+          if (message[i] == 'b')
+          {
+          scrollMessage(scrollText64);
+          }
+
+          if (message[i] == 'c')
+          {
+          scrollMessage(scrollText65);
+          }
+
+          if (message[i] == 'd')
+          {
+          scrollMessage(scrollText66);
+          }
+
+          if (message[i] == 'e')
+          {
+          scrollMessage(scrollText67);
+          }
+
+          if (message[i] == 'f')
+          {
+          scrollMessage(scrollText68);
+          }
+
+          if (message[i] == 'g')
+          {
+          scrollMessage(scrollText69);
+          }
+
+          if (message[i] == 'h')
+          {
+          scrollMessage(scrollText70);
+          }
+
+          if (message[i] == 'i')
+          {
+          scrollMessage(scrollText71);
+          }
+
+          if (message[i] == 'j')
+          {
+          scrollMessage(scrollText72);
+          }
+
+          if (message[i] == 'k')
+          {
+          scrollMessage(scrollText73);
+          }
+
+          if (message[i] == 'l')
+          {
+          scrollMessage(scrollText74);
+          }
+
+          if (message[i] == 'm')
+          {
+          scrollMessage(scrollText75);
+          }
+
+          if (message[i] == 'n')
+          {
+          scrollMessage(scrollText76);
+          }
+
+          if (message[i] == 'o')
+          {
+          scrollMessage(scrollText77);
+          }
+
+          if (message[i] == 'p')
+          {
+          scrollMessage(scrollText78);
+          }
+
+          if (message[i] == 'q')
+          {
+          scrollMessage(scrollText79);
+          }
+
+          if (message[i] == 'r')
+          {
+          scrollMessage(scrollText80);
+          }
+
+          if (message[i] == 's')
+          {
+          scrollMessage(scrollText81);
+          }
+
+          if (message[i] == 't')
+          {
+          scrollMessage(scrollText82);
+          }
+
+          if (message[i] == 'u')
+          {
+          scrollMessage(scrollText83);
+          }
+
+          if (message[i] == 'v')
+          {
+          scrollMessage(scrollText84);
+          }
+
+          if (message[i] == 'w')
+          {
+          scrollMessage(scrollText85);
+          }
+
+          if (message[i] == 'x')
+          {
+          scrollMessage(scrollText86);
+          }
+
+          if (message[i] == 'y')
+          {
+          scrollMessage(scrollText87);
+          }
+
+          if (message[i] == 'z')
+          {
+          scrollMessage(scrollText88);
+          }
+
+          if (message[i] == '{')
+          {
+          scrollMessage(scrollText89);
+          }
+
+          if (message[i] == '|')
+          {
+          scrollMessage(scrollText90);
+          }
+
+          if (message[i] == '}')
+          {
+          scrollMessage(scrollText91);
+          }
+
+          if (message[i] == '~')
+          {
+          scrollMessage(scrollText92);
+          }
+
+          if ((i+1) == message.length()) {
+            requestData();
+            delay(200);
+          }
+
+       }
 }
- 
+
 //////////////////////////////////////////////////////EDIT THE CHARACTERS///////////////////////////////////////////
- 
+
 const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged as 7x font data + 1x kerning data)
     B00000000,  //Space (Char 0x20)
     B00000000,
@@ -652,7 +657,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00000000,
     3,//this number gives the empty space column amount between the characters
- 
+
     B10000000,  //!
     B10000000,
     B10000000,
@@ -661,7 +666,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B10000000,
     2,
- 
+
     B10100000,  //"
     B10100000,
     B10100000,
@@ -670,7 +675,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00000000,
     4,
- 
+
     B01010000,  //#
     B01010000,
     B11111000,
@@ -679,7 +684,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01010000,
     B01010000,
     6,
- 
+
     B00100000,  //$
     B01111000,
     B10100000,
@@ -688,7 +693,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B11110000,
     B00100000,
     6,
- 
+
     B11000000,  //%
     B11001000,
     B00010000,
@@ -697,7 +702,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10011000,
     B00011000,
     6,
- 
+
     B01100000,  //&
     B10010000,
     B10100000,
@@ -706,7 +711,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10010000,
     B01101000,
     6,
- 
+
     B11000000,  //'
     B01000000,
     B10000000,
@@ -715,7 +720,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00000000,
     3,
- 
+
     B00100000,  //(
     B01000000,
     B10000000,
@@ -724,7 +729,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B00100000,
     4,
- 
+
     B10000000,  //)
     B01000000,
     B00100000,
@@ -733,7 +738,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B10000000,
     4,
- 
+
     B00000000,  //*
     B00100000,
     B10101000,
@@ -742,7 +747,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00100000,
     B00000000,
     6,
- 
+
     B00000000,  //+
     B00100000,
     B00100000,
@@ -751,7 +756,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00100000,
     B00000000,
     6,
- 
+
     B00000000,  //,
     B00000000,
     B00000000,
@@ -760,7 +765,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B10000000,
     3,
- 
+
     B00000000,  //-
     B00000000,
     B11111000,
@@ -769,7 +774,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00000000,
     6,
- 
+
     B00000000,  //.
     B00000000,
     B00000000,
@@ -778,7 +783,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B11000000,
     B11000000,
     3,
- 
+
     B00000000,  ///
     B00001000,
     B00010000,
@@ -787,7 +792,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B00000000,
     6,
- 
+
     B01110000,  //0
     B10001000,
     B10011000,
@@ -796,7 +801,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B01000000,  //1
     B11000000,
     B01000000,
@@ -805,7 +810,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B11100000,
     4,
- 
+
     B01110000,  //2
     B10001000,
     B00001000,
@@ -814,7 +819,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B11111000,
     6,
- 
+
     B11111000,  //3
     B00010000,
     B00100000,
@@ -823,7 +828,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B00010000,  //4
     B00110000,
     B01010000,
@@ -832,7 +837,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00010000,
     B00010000,
     6,
- 
+
     B11111000,  //5
     B10000000,
     B11110000,
@@ -841,7 +846,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B00110000,  //6
     B01000000,
     B10000000,
@@ -850,7 +855,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B11111000,  //7
     B10001000,
     B00001000,
@@ -859,7 +864,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00100000,
     B00100000,
     6,
- 
+
     B01110000,  //8
     B10001000,
     B10001000,
@@ -868,7 +873,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B01110000,  //9
     B10001000,
     B10001000,
@@ -877,7 +882,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00010000,
     B01100000,
     6,
- 
+
     B00000000,  //:
     B11000000,
     B11000000,
@@ -886,7 +891,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B11000000,
     B00000000,
     3,
- 
+
     B00000000,  //;
     B11000000,
     B11000000,
@@ -895,7 +900,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B10000000,
     3,
- 
+
     B00010000,  //<
     B00100000,
     B01000000,
@@ -904,7 +909,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00100000,
     B00010000,
     5,
- 
+
     B00000000,  //=
     B00000000,
     B11111000,
@@ -913,7 +918,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00000000,
     6,
- 
+
     B10000000,  //>
     B01000000,
     B00100000,
@@ -922,7 +927,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B10000000,
     5,
- 
+
     B01110000,  //?
     B10001000,
     B00001000,
@@ -931,7 +936,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00100000,
     6,
- 
+
     B01110000,  //@
     B10001000,
     B00001000,
@@ -940,7 +945,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10101000,
     B01110000,
     6,
- 
+
     B01110000,  //A
     B10001000,
     B10001000,
@@ -949,7 +954,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B10001000,
     6,
- 
+
     B11110000,  //B
     B10001000,
     B10001000,
@@ -958,7 +963,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B11110000,
     6,
- 
+
     B01110000,  //C
     B10001000,
     B10000000,
@@ -967,7 +972,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B11100000,  //D
     B10010000,
     B10001000,
@@ -976,7 +981,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10010000,
     B11100000,
     6,
- 
+
     B11111000,  //E
     B10000000,
     B10000000,
@@ -985,7 +990,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B11111000,
     6,
- 
+
     B11111000,  //F
     B10000000,
     B10000000,
@@ -994,7 +999,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B10000000,
     6,
- 
+
     B01110000,  //G
     B10001000,
     B10000000,
@@ -1003,7 +1008,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01111000,
     6,
- 
+
     B10001000,  //H
     B10001000,
     B10001000,
@@ -1012,7 +1017,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B10001000,
     6,
- 
+
     B11100000,  //I
     B01000000,
     B01000000,
@@ -1021,7 +1026,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B11100000,
     4,
- 
+
     B00111000,  //J
     B00010000,
     B00010000,
@@ -1030,7 +1035,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10010000,
     B01100000,
     6,
- 
+
     B10001000,  //K
     B10010000,
     B10100000,
@@ -1039,7 +1044,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10010000,
     B10001000,
     6,
- 
+
     B10000000,  //L
     B10000000,
     B10000000,
@@ -1048,7 +1053,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B11111000,
     6,
- 
+
     B10001000,  //M
     B11011000,
     B10101000,
@@ -1057,7 +1062,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B10001000,
     6,
- 
+
     B10001000,  //N
     B10001000,
     B11001000,
@@ -1066,7 +1071,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B10001000,
     6,
- 
+
     B01110000,  //O
     B10001000,
     B10001000,
@@ -1075,7 +1080,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B11110000,  //P
     B10001000,
     B10001000,
@@ -1084,7 +1089,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B10000000,
     6,
- 
+
     B01110000,  //Q
     B10001000,
     B10001000,
@@ -1093,7 +1098,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10010000,
     B01101000,
     6,
- 
+
     B11110000,  //R
     B10001000,
     B10001000,
@@ -1102,7 +1107,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10010000,
     B10001000,
     6,
- 
+
     B01111000,  //S
     B10000000,
     B10000000,
@@ -1111,7 +1116,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00001000,
     B11110000,
     6,
- 
+
     B11111000,  //T
     B00100000,
     B00100000,
@@ -1120,7 +1125,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00100000,
     B00100000,
     6,
- 
+
     B10001000,  //U
     B10001000,
     B10001000,
@@ -1129,7 +1134,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B10001000,  //V
     B10001000,
     B10001000,
@@ -1138,7 +1143,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01010000,
     B00100000,
     6,
- 
+
     B10001000,  //W
     B10001000,
     B10001000,
@@ -1147,7 +1152,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10101000,
     B01010000,
     6,
- 
+
     B10001000,  //X
     B10001000,
     B01010000,
@@ -1156,7 +1161,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B10001000,
     6,
- 
+
     B10001000,  //Y
     B10001000,
     B10001000,
@@ -1165,7 +1170,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00100000,
     B00100000,
     6,
- 
+
     B11111000,  //Z
     B00001000,
     B00010000,
@@ -1174,7 +1179,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B11111000,
     6,
- 
+
     B11100000,  //[
     B10000000,
     B10000000,
@@ -1183,7 +1188,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B11100000,
     4,
- 
+
     B00000000,  //(Backward Slash)
     B10000000,
     B01000000,
@@ -1192,7 +1197,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00001000,
     B00000000,
     6,
- 
+
     B11100000,  //]
     B00100000,
     B00100000,
@@ -1201,7 +1206,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00100000,
     B11100000,
     4,
- 
+
     B00100000,  //^
     B01010000,
     B10001000,
@@ -1210,7 +1215,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00000000,
     6,
- 
+
     B00000000,  //_
     B00000000,
     B00000000,
@@ -1219,7 +1224,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B11111000,
     6,
- 
+
     B10000000,  //`
     B01000000,
     B00100000,
@@ -1228,7 +1233,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00000000,
     4,
- 
+
     B00000000,  //a
     B00000000,
     B01110000,
@@ -1237,7 +1242,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01111000,
     6,
- 
+
     B10000000,  //b
     B10000000,
     B10110000,
@@ -1246,7 +1251,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B11110000,
     6,
- 
+
     B00000000,  //c
     B00000000,
     B01110000,
@@ -1255,7 +1260,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B00001000,  //d
     B00001000,
     B01101000,
@@ -1264,7 +1269,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01111000,
     6,
- 
+
     B00000000,  //e
     B00000000,
     B01110000,
@@ -1273,7 +1278,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B01110000,
     6,
- 
+
     B00110000,  //f
     B01001000,
     B01000000,
@@ -1282,7 +1287,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B01000000,
     6,
- 
+
     B00000000,  //g
     B01111000,
     B10001000,
@@ -1291,7 +1296,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00001000,
     B01110000,
     6,
- 
+
     B10000000,  //h
     B10000000,
     B10110000,
@@ -1300,7 +1305,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B10001000,
     6,
- 
+
     B01000000,  //i
     B00000000,
     B11000000,
@@ -1309,7 +1314,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B11100000,
     4,
- 
+
     B00010000,  //j
     B00000000,
     B00110000,
@@ -1318,7 +1323,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10010000,
     B01100000,
     5,
- 
+
     B10000000,  //k
     B10000000,
     B10010000,
@@ -1327,7 +1332,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10100000,
     B10010000,
     5,
- 
+
     B11000000,  //l
     B01000000,
     B01000000,
@@ -1336,7 +1341,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B11100000,
     4,
- 
+
     B00000000,  //m
     B00000000,
     B11010000,
@@ -1345,7 +1350,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B10001000,
     6,
- 
+
     B00000000,  //n
     B00000000,
     B10110000,
@@ -1354,7 +1359,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B10001000,
     6,
- 
+
     B00000000,  //o
     B00000000,
     B01110000,
@@ -1363,7 +1368,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10001000,
     B01110000,
     6,
- 
+
     B00000000,  //p
     B00000000,
     B11110000,
@@ -1372,7 +1377,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B10000000,
     6,
- 
+
     B00000000,  //q
     B00000000,
     B01101000,
@@ -1381,7 +1386,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00001000,
     B00001000,
     6,
- 
+
     B00000000,  //r
     B00000000,
     B10110000,
@@ -1390,7 +1395,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B10000000,
     6,
- 
+
     B00000000,  //s
     B00000000,
     B01110000,
@@ -1399,7 +1404,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00001000,
     B11110000,
     6,
- 
+
     B01000000,  //t
     B01000000,
     B11100000,
@@ -1408,7 +1413,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01001000,
     B00110000,
     6,
- 
+
     B00000000,  //u
     B00000000,
     B10001000,
@@ -1417,7 +1422,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10011000,
     B01101000,
     6,
- 
+
     B00000000,  //v
     B00000000,
     B10001000,
@@ -1426,7 +1431,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01010000,
     B00100000,
     6,
- 
+
     B00000000,  //w
     B00000000,
     B10001000,
@@ -1435,7 +1440,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10101000,
     B01010000,
     6,
- 
+
     B00000000,  //x
     B00000000,
     B10001000,
@@ -1444,7 +1449,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01010000,
     B10001000,
     6,
- 
+
     B00000000,  //y
     B00000000,
     B10001000,
@@ -1453,7 +1458,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00001000,
     B01110000,
     6,
- 
+
     B00000000,  //z
     B00000000,
     B11111000,
@@ -1462,7 +1467,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B11111000,
     6,
- 
+
     B00100000,  //{
     B01000000,
     B01000000,
@@ -1471,7 +1476,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B00100000,
     4,
- 
+
     B10000000,  //|
     B10000000,
     B10000000,
@@ -1480,7 +1485,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B10000000,
     B10000000,
     2,
- 
+
     B10000000,  //}
     B01000000,
     B01000000,
@@ -1489,7 +1494,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B01000000,
     B10000000,
     4,
- 
+
     B00000000,  //~
     B00000000,
     B00000000,
@@ -1498,7 +1503,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00000000,
     6,
- 
+
     B01100000,  // (Char 0x7F)
     B10010000,
     B10010000,
@@ -1507,7 +1512,7 @@ const unsigned char font5x7 [] PROGMEM = {      //Numeric Font Matrix (Arranged 
     B00000000,
     B00000000,
     5,
-    
+
     B00000000,  // smiley
     B01100000,
     B01100110,
@@ -1529,19 +1534,19 @@ void scrollFont() {
         delay(500);
     }
 }
- 
+
 // Scroll Message
 void scrollMessage(const unsigned char * messageString) {
     int counter = 0;
     int myChar=0;
     do {
-        // read back a char 
-        myChar =  pgm_read_byte_near(messageString + counter); 
+        // read back a char
+        myChar =  pgm_read_byte_near(messageString + counter);
         if (myChar != 0){
             loadBufferLong(myChar);
         }
         counter++;
-    } 
+    }
     while (myChar != 0);
 }
 // Load character into scroll buffer
@@ -1573,7 +1578,7 @@ void rotateBufferLong(){
         bitWrite(x,0,b);                        // Store saved bit
         bufferLong [a*2+1] = x;                 // Store new high buffer
     }
-}  
+}
 // Display Buffer on LED matrix
 void printBufferLong(){
   for (int a=0;a<7;a++){                    // Loop 7 times for a 5x7 font
@@ -1595,53 +1600,62 @@ void initDuration() {
   // On réduit le pourcentage de progression sur 32
 
   percentageAvancement = round((progress_ms/duration_ms)*32);
+  int x = percentageAvancement;
 
-  int surplus = percentageAvancement%8;
-  int nbDeviceToTurnOn = percentageAvancement/8;
+  int surplus = x%8;
+  int nbDeviceToTurnOn = x/8;
 
   int currentDevice = 3;
-
-  //  percentageAvancement = 12;
-  // Passage 1 :
-  //  currentDevice = 3
-  //  i = nbDeviceToTurnOn = 1
-  // avancementMusique[percentageAvancement-a]
-  // Passage 2 :
-  //  currentDevice = 2
-  //  i = nbDeviceToTurnOn = 2
-  // avancementMusique[percentageAvancement-a]
-
-  /*for(int i=nbDeviceToTurnOn; i>=0; i--) {
-
-    lc.setRow(currentDevice, 7, (avancementMusique[percentageAvancement/(nbDeviceToTurnOn+surplus)]));
-    currentDevice--;
-  }
-  lc.setRow(currentDevice, 7, (avancementMusique[surplus]));
-  */
-
 
   int device = 3;
   int counter = 0;
 
-  while (percentageAvancement > 0) {
+  while (x > 0) {
 
     // Quand on atteind 8, on passe au device suivant car on a allumé toutes les leds précédentes
     if (counter == 8) {
       counter = 0;
       device--;
     }
-    
-    
+
+
     lc.setLed(device, 7, counter, true);
 
     counter++;
-    percentageAvancement--;
+    x--;
   }
 }
+
+void resetDuration() {
+
+  int currentDevice = 3;
+  int x = 32;
+
+  int device = 3;
+  int counter = 0;
+
+  while (x > 0) {
+
+    // Quand on atteind 8, on passe au device suivant car on a allumé toutes les leds précédentes
+    if (counter == 8) {
+      counter = 0;
+      device--;
+    }
+
+
+    lc.setLed(device, 7, counter, false);
+
+    counter++;
+    x--;
+  }
+}
+/*
 
 void setDuration() {
   // On perd quelques chiffres
   //Serial.println(percentageAvancement);
+
+  percentageAvancement = round((progress_ms/duration_ms)*32);
 
 
   if (percentageAvancement < 9) {
@@ -1660,4 +1674,4 @@ void setDuration() {
     lc.setRow(0, 7, avancementMusique[percentageAvancement - 24]);
   }
 
-}
+} */
