@@ -1,0 +1,21 @@
+{
+  "name": "Spotify-Arduino",
+  "description": "",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "serve": "nodemon --exec `node index.js`",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@serialport/parser-readline": "^8.0.6",
+    "dotenv": "^15.0.0",
+    "express": "^4.17.2",
+    "ht1632": "^1.0.0",
+    "johnny-five": "^2.1.0",
+    "node-spotify-api": "^1.1.1",
+    "serialport": "^8.0.8",
+    "spotify-api.js": "^9.0.3",
+    "spotify-web-api-node": "^5.0.2"
+  }
+}
